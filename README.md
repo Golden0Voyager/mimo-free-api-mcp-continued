@@ -1,11 +1,13 @@
-# MiMo Free API MCP🚀 (V2.5 + V2.6 Series)
+# MiMo Free API MCP 🚀 Continued (V2.5 + V2.6 Series)
 
-[![CI](https://github.com/Golden0Voyager/mimo-free-api-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Golden0Voyager/mimo-free-api-mcp/actions/workflows/ci.yml) [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE) [![Node](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
+[![CI](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml/badge.svg)](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml) [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE) [![Node](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
 [English](./README_EN.md) | 简体中文
 
 
 > 基于小米大模型（MiMo）官方网站（[aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)）逆向构建的高级 OpenAI 兼容网关 + 原生 MCP 插件集成。现已全量适配 **MiMo V2.5 全模态** 系列，并新增 **MiMo V2.6** 系列支持，支持 **Thinking (思维链) 协议** 与 **Omni (全模态) 交互**。
+>
+> **🎉 v1.4.0**：已适配平台 2026-10 大版本升级（react 协议），并修复工具调用（Function Calling）。上游 [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) 已于 2026-04 停止维护，本仓库持续跟进平台变更。
 
 ---
 
@@ -13,10 +15,11 @@
 
 1.  **V2.5 全模态适配**: 深度集成 `mimo-v2.5` 与 `mimo-v2.5-pro` 模型，支持原生图像、视频、音频的复杂分析。
 2.  **V2.6 新增支持**: 新增 `mimo-v2.6-pro`（旗舰推理）与 `mimo-v2.6-flash`（极速轻量）两个模型 ID，可直接请求使用；V2.5 仍为默认模型。
-3.  **Thinking 协议对齐**: 完美支持官方最新的思维链 (Reasoning) 协议。流式输出中自动包含 `reasoning_content`，真实还原 AI 思考过程。
-4.  **透明升级路由**: 保持对 V2 时代的兼容。请求 `mimo-v2-omni` 会自动平滑路由至 `mimo-v2.5`，`mimo-v2-pro` 会路由至 `mimo-v2.5-pro`。
-5.  **环境化 Token 配置**: 支持在 `.env` 中通过 `token` 环境变量（格式：`ph.uid.token`）完成一键部署。
-6.  **Native MCP Server**: 集成最新 MCP 标准。赋予 Claude / Cursor 等客户端原生的 **联网搜索 (`search`)** 与 **视觉分析 (`vision`)** 能力。
+3.  **2026-10 平台升级适配 (v1.4.0)**: 平台切换 react 协议后第一时间跟进迁移（`/open-apis/react/chat`），包括思维链独立字段、图片内容审核（audit/submit）链路与错误事件透传。
+4.  **工具调用修复 (v1.4.0)**: 平台反注入过滤导致旧标记失效，本仓库改用 `[TOOL_CALL]` 标记协议，Function Calling 恢复可用（外部工具场景实测稳定）。
+5.  **透明升级路由**: 保持对旧模型 ID 的兼容。请求 `mimo-v2-omni` 自动路由至 `mimo-v2.5`，`mimo-v2-pro` 路由至 `mimo-v2.5-pro`，已下线的 `mimo-v2-flash` 路由至 `mimo-v2.6-flash`。
+6.  **环境化 Token 配置**: 支持在 `.env` 中通过 `token` 环境变量（格式：`ph.uid.token`）完成一键部署。
+7.  **Native MCP Server**: 集成最新 MCP 标准。赋予 Claude / Cursor 等客户端原生的 **联网搜索 (`search`)** 与 **视觉分析 (`vision`)** 能力。
 
 ---
 
@@ -28,7 +31,7 @@
 | `mimo-v2.6-flash` | **V2.6 极速轻量版** 🆕 | 🔁 原生思维链（始终输出 `reasoning_content`） | 快速响应，混合推理架构 |
 | `mimo-v2.5` | **全模态旗舰**（默认模型） | ✅ 默认开启 | 视觉、音频、多模态理解最佳方案 |
 | `mimo-v2.5-pro` | **推理增强版** | ✅ 默认开启 | 逻辑严密、最强搜索与长文本分析 |
-| `mimo-v2-flash` | **极速轻量版** | 可选 (后缀激活) | 毫秒级响应，适合简单对话与翻译 |
+| `mimo-v2-flash` | (已下线) | — | 平台 2026-10 下线，自动路由至 `mimo-v2.6-flash` |
 | `mimo-v2-omni` | (兼容 ID) | ✅ (路由至 2.5) | 兼容旧版 V2-Omni 客户端 |
 | `mimo-v2-pro` | (兼容 ID) | ✅ (路由至 2.5-pro) | 兼容旧版 V2-Pro 客户端 |
 
@@ -37,7 +40,7 @@
 > **MCP 工具模型配置**：可在 `.env` 中通过 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 指定 `search` / `vision` 工具使用的模型（默认分别为 `mimo-v2.5-pro` / `mimo-v2.5`）。
 
 > [!WARNING]
-> **工具调用 (Tool Calling) 限制**：目前模型原生工具调用（Function Calling）极度不稳定，**无法在 Agent（如 AutoGPT、LangChain Agent 等）中可靠使用**。建议仅作为对话、视觉分析或通过 MCP 插件在支持的客户端（如 Claude/Cursor）中使用。
+> **工具调用 (Tool Calling)**：v1.4.0 起通过 `[TOOL_CALL]` 标记协议恢复可用（平台会在 prompt 中过滤 `<tool_call>` 字面量）。实测**外部工具**（日程创建、文件操作等客户端专属能力）触发稳定；但对联网搜索可回答的问题，模型会倾向使用平台内置搜索直接作答而非调用注入的搜索类工具，这是平台侧行为，无法在客户端禁用。
 
 ---
 
@@ -155,13 +158,13 @@ docker run -d --name mimo-free-api-mcp \
   --restart always \
   -p 8001:8001 \
   -e token=<你的Token> \
-  ghcr.io/golden0voyager/mimo-free-api-mcp:v1.3.0
+  ghcr.io/golden0voyager/mimo-free-api-mcp-continued:v1.4.0
 ```
 
 > [!NOTE]
 > - **镜像本身不包含任何凭证**：每个用户必须通过 `-e token=` 注入**自己的** Token（获取方式见上文「新手教程」），也可以改用 `-e xiaomichatbot_ph=xxx -e userId=xxx -e xiaomichatbot_serviceToken=xxx` 三段式注入。
 > - Token 过期后无需重新拉镜像，重启容器换新 token 即可：`docker rm -f mimo-free-api-mcp` 后用新值重跑上面的命令。
-> - 全部可用版本见[镜像发布页](https://github.com/Golden0Voyager/mimo-free-api-mcp/pkgs/container/mimo-free-api-mcp)；也可使用 `latest` 标签跟随主线。
+> - 全部可用版本见[镜像发布页](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/pkgs/container/mimo-free-api-mcp-continued)；也可使用 `latest` 标签跟随主线。
 
 ### 方式二：源码构建（适合需要自定义的开发者）
 
@@ -186,7 +189,7 @@ docker compose up -d --build
 - 确定服务端口：默认容器内 8001，宿主机映射见 docker-compose.yml（默认 127.0.0.1:8002->8001）。若端口被占用，修改 docker-compose.yml 左侧端口为空闲端口。
 
 【阶段 1：获取代码】
-- git clone https://github.com/Golden0Voyager/mimo-free-api-mcp.git 并进入项目目录。
+- git clone https://github.com/Golden0Voyager/mimo-free-api-mcp-continued.git 并进入项目目录。
 - 完成标准：README.md 与 docker-compose.yml 存在。
 
 【阶段 2：获取凭证（关键）】
@@ -229,6 +232,22 @@ docker compose up -d --build
 
 ---
 
-## 🙏 致谢 (Acknowledgements)
+## 🙏 上游来源与本项目贡献 (Upstream & Contributions)
 
-本项目基于 [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) 构建，感谢原作者的核心逆向工程与实现。本仓库在其基础上适配 MiMo V2.6 系列、修复 V2.6 Flash 模型路由，并补充 CI 质检等社区维护。
+本项目 fork 自 [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp)（v1.2.1，最后更新 2026-04-26），感谢原作者 [Fu-Jie](https://github.com/Fu-Jie) 对 MiMo 官方 Web 接口的核心逆向工程与最初实现。因上游已停止维护，而小米平台仍在持续变更，本仓库以 **mimo-free-api-mcp-continued** 的名义继续维护，并将与上游的差异保持在本文件中公开记录。
+
+**继承自上游**（v1.2.1，GPL-3.0）：
+
+- MiMo 官方 Web 接口逆向与 OpenAI 兼容网关的核心实现
+- 基础对话、视觉上传三步走（genUploadInfo → FDS PUT → parse）协议
+- 统一 API & MCP Server 架构、Docker 部署方案
+
+**本仓库的贡献**（v1.3.0 → v1.4.0）：
+
+| 版本 | 贡献 |
+| :--- | :--- |
+| v1.3.0 | MiMo V2.6 系列（pro / flash）支持；视觉/工具自动升配尊重显式 V2.6 请求；MCP 工具模型可经 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 配置；V2.6 Flash 裸 ID 路由修复 |
+| v1.4.0 | 适配平台 2026-10 react 协议升级（旧端点已全面失效）：全链路迁移至 `/open-apis/react/chat`、思维链独立 `reasoningContent` 字段、图片审核（audit/submit）新链路、`error`/`sensitive_query` 事件透传、`[TOOL_CALL]` 标记协议使 Function Calling 恢复可用、已下线 `mimo-v2-flash` 自动映射 |
+| 持续性 | GitHub Actions CI（tsc 硬门槛 + 构建）、GHCR 双架构预构建镜像、中英双语文档、一键部署 Prompt、免责声明与 Token 获取教程 |
+
+> 平台协议信息（react 端点、SSE 事件结构、模型存留）均来自对官方网页客户端的实机抓包验证。
