@@ -1,11 +1,13 @@
-# MiMo Free API MCP🚀 (V2.5 + V2.6 Series)
+# MiMo Free API MCP 🚀 Continued (V2.5 + V2.6 Series)
 
-[![CI](https://github.com/Golden0Voyager/mimo-free-api-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Golden0Voyager/mimo-free-api-mcp/actions/workflows/ci.yml) [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE) [![Node](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
+[![CI](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml/badge.svg)](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml) [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE) [![Node](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
 English | [简体中文](./README.md)
 
 
 > An advanced OpenAI-compatible gateway + native MCP plugin integration based on the reverse engineering of the official Xiaomi Large Model (MiMo) website ([aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)). Now fully adapted to the **MiMo V2.5 Multimodal** series, with newly added support for the **MiMo V2.6** series, supporting the **Thinking (Chain of Thought) protocol** and **Omni (Multimodal) interaction**.
+>
+> **🎉 v1.4.0**: Adapted to the platform's major 2026-10 upgrade (react protocol) and restored Function Calling. Upstream [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) went unmaintained in April 2026; this repository keeps tracking platform changes.
 
 ---
 
@@ -13,10 +15,11 @@ English | [简体中文](./README.md)
 
 1.  **V2.5 Multimodal Adaptation**: Deep integration of `mimo-v2.5` and `mimo-v2.5-pro` models, supporting complex analysis of native images, videos, and audio.
 2.  **New V2.6 Support**: Adds the `mimo-v2.6-pro` (flagship reasoning) and `mimo-v2.6-flash` (ultra-fast lightweight) model IDs, ready to use directly; V2.5 remains the default model.
-3.  **Thinking Protocol Alignment**: Perfectly supports the latest official Chain of Thought (Reasoning) protocol. Stream output automatically includes `reasoning_content`, authentically restoring the AI's thinking process.
-4.  **Transparent Upgrade Routing**: Maintains compatibility with the V2 era. Requests for `mimo-v2-omni` are smoothly routed to `mimo-v2.5`, and `mimo-v2-pro` to `mimo-v2.5-pro`.
-5.  **Environmental Token Configuration**: Supports one-click deployment via the `token` environment variable (format: `ph.uid.token`) in `.env`.
-6.  **Native MCP Server**: Integrated with the latest MCP standards. Empowers clients like Claude and Cursor with native **web search (`search`)** and **visual analysis (`vision`)** capabilities.
+3.  **2026-10 Platform Upgrade Adaptation (v1.4.0)**: First-in-time migration after the platform switched to the react protocol (`/open-apis/react/chat`), including the standalone reasoning field, the new image moderation (audit/submit) pipeline, and error event passthrough.
+4.  **Tool Calling Fixed (v1.4.0)**: The platform's anti-injection filter broke the old marker; this repo switched to a `[TOOL_CALL]` marker protocol and Function Calling works again (verified stable for external tools).
+5.  **Transparent Upgrade Routing**: Maintains compatibility with legacy model IDs. Requests for `mimo-v2-omni` are routed to `mimo-v2.5`, `mimo-v2-pro` to `mimo-v2.5-pro`, and the retired `mimo-v2-flash` to `mimo-v2.6-flash`.
+6.  **Environmental Token Configuration**: Supports one-click deployment via the `token` environment variable (format: `ph.uid.token`) in `.env`.
+7.  **Native MCP Server**: Integrated with the latest MCP standards. Empowers clients like Claude and Cursor with native **web search (`search`)** and **visual analysis (`vision`)** capabilities.
 
 ---
 
@@ -28,7 +31,7 @@ English | [简体中文](./README.md)
 | `mimo-v2.6-flash` | **V2.6 Ultra-fast Lightweight** 🆕 | 🔁 Native reasoning (always outputs `reasoning_content`) | Fast response, hybrid reasoning architecture |
 | `mimo-v2.5` | **Multimodal Flagship** (default model) | ✅ Enabled by default | Best for visual, audio, and multimodal understanding |
 | `mimo-v2.5-pro` | **Inference Enhanced** | ✅ Enabled by default | Rigorous logic, strongest search, and long-text analysis |
-| `mimo-v2-flash` | **Ultra-fast Lightweight** | Optional (via suffix) | Millisecond response, ideal for simple dialogue and translation |
+| `mimo-v2-flash` | (Retired) | — | Retired by the platform in 2026-10; auto-routed to `mimo-v2.6-flash` |
 | `mimo-v2-omni` | (Compatibility ID) | ✅ (Routed to 2.5) | Compatible with legacy V2-Omni clients |
 | `mimo-v2-pro` | (Compatibility ID) | ✅ (Routed to 2.5-pro) | Compatible with legacy V2-Pro clients |
 
@@ -37,7 +40,7 @@ English | [简体中文](./README.md)
 > **MCP Tool Model Configuration**: You can set `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` in `.env` to choose the models used by the `search` / `vision` tools (defaults: `mimo-v2.5-pro` / `mimo-v2.5`).
 
 > [!WARNING]
-> **Tool Calling Limitation**: Native Function Calling is currently extremely unstable and **cannot be reliably used in Agents (e.g., AutoGPT, LangChain Agents)**. It is recommended for use only in dialogue, visual analysis, or via the MCP plugin in supported clients (e.g., Claude/Cursor).
+> **Tool Calling**: As of v1.4.0, Function Calling works again via the `[TOOL_CALL]` marker protocol (the platform filters the literal `<tool_call>` out of prompts). Verified stable for **external tools** (calendar creation, file operations and other client-only capabilities); however, for questions answerable via web search, the model prefers the platform's built-in search and answers directly instead of calling injected search tools — platform-side behavior that cannot be disabled client-side.
 
 ---
 
@@ -155,13 +158,13 @@ docker run -d --name mimo-free-api-mcp \
   --restart always \
   -p 8001:8001 \
   -e token=<your-token> \
-  ghcr.io/golden0voyager/mimo-free-api-mcp:v1.3.0
+  ghcr.io/golden0voyager/mimo-free-api-mcp-continued:v1.4.0
 ```
 
 > [!NOTE]
 > - **The image contains no credentials**: every user must inject **their own** token via `-e token=` (see the "Beginner's Guide" above), or the split form `-e xiaomichatbot_ph=xxx -e userId=xxx -e xiaomichatbot_serviceToken=xxx`.
 > - When the token expires there is no need to re-pull the image — just remove and re-run with a fresh token: `docker rm -f mimo-free-api-mcp`.
-> - See all published versions on the [package page](https://github.com/Golden0Voyager/mimo-free-api-mcp/pkgs/container/mimo-free-api-mcp); a `latest` tag tracks the mainline.
+> - See all published versions on the [package page](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/pkgs/container/mimo-free-api-mcp-continued); a `latest` tag tracks the mainline.
 
 ### Option 2: Build from source (for customization)
 
@@ -186,7 +189,7 @@ You are the automated deployment assistant for the mimo-free-api-mcp project. Ex
 - Service port: container listens on 8001; host mapping is in docker-compose.yml (default 127.0.0.1:8002->8001). If the port is taken, change the left-side port to a free one.
 
 [Phase 1: Get the code]
-- git clone https://github.com/Golden0Voyager/mimo-free-api-mcp.git and cd into it.
+- git clone https://github.com/Golden0Voyager/mimo-free-api-mcp-continued.git and cd into it.
 - Completion criteria: README.md and docker-compose.yml exist.
 
 [Phase 2: Obtain credentials (critical)]
@@ -229,6 +232,22 @@ Please read and understand the following terms before using this project:
 
 ---
 
-## 🙏 Acknowledgements
+## 🙏 Upstream & Contributions
 
-This project is built on top of [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) — credits to the original author for the core reverse engineering and implementation. This repository adapts the MiMo V2.6 series, fixes V2.6 Flash model routing, and adds CI quality gates as community maintenance.
+This project is forked from [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) (v1.2.1, last updated 2026-04-26) — credits to the original author [Fu-Jie](https://github.com/Fu-Jie) for the core reverse engineering of the MiMo web interface and the initial implementation. Since upstream is no longer maintained while the Xiaomi platform keeps evolving, this repository continues maintenance under the name **mimo-free-api-mcp-continued** and keeps its divergence from upstream documented here.
+
+**Inherited from upstream** (v1.2.1, GPL-3.0):
+
+- Core reverse-engineered MiMo web interface and OpenAI-compatible gateway
+- Base dialogue and the three-step media upload protocol (genUploadInfo → FDS PUT → parse)
+- Unified API & MCP Server architecture and the Docker deployment scheme
+
+**This repository's contributions** (v1.3.0 → v1.4.0):
+
+| Version | Contribution |
+| :--- | :--- |
+| v1.3.0 | MiMo V2.6 series (pro / flash) support; vision/tools auto-upgrade respects explicitly requested V2.6; MCP tool models configurable via `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL`; bare-ID routing fix for V2.6 Flash |
+| v1.4.0 | Adaptation to the platform's 2026-10 react protocol upgrade (old endpoint fully retired): full migration to `/open-apis/react/chat`, standalone `reasoningContent` field, new image moderation (audit/submit) pipeline, `error`/`sensitive_query` passthrough, `[TOOL_CALL]` marker protocol restoring Function Calling, auto-mapping of the retired `mimo-v2-flash` |
+| Ongoing | GitHub Actions CI (hard tsc gate + build), GHCR multi-arch prebuilt images, bilingual docs, one-shot deployment prompt, disclaimer and token guide |
+
+> Platform protocol details (react endpoint, SSE event structure, model availability) were verified against live captures of the official web client.
