@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "crypto";
 import * as mimo from "./mimo.ts";
+import type { SearchResponse, SearchResultItem, VisionResponse } from "./mimo.ts";
 import logger from "@/lib/logger.ts";
 import Request from "@/lib/request/Request.ts";
 
@@ -85,22 +86,42 @@ export class MCPServerManager {
 
             try {
                 if (name === "search") {
-                    const { query } = args as { query: string };
-                    const result = await mimo.performSearch(query, request) as any;
+                    const { query } = (args ?? {}) as { query: string };
+                    const result: SearchResponse = await mimo.performSearch(query, request);
 
-                    let text = "No search results found.";
-                    if (result && result.data && result.data.results) {
-                        text = result.data.results
-                            .map((r: any) => `### ${r.title}\nURL: ${r.url}\n${r.snippet}`)
-                            .join("\n\n");
+                    if (result.error) {
+                        const errText = typeof result.error === "string" ? result.error : JSON.stringify(result.error);
+                        const detail = result.details ? ` | ${result.details.slice(0, 300)}` : "";
+                        return {
+                            content: [{ type: "text", text: `Error: ${errText}${detail}` }],
+                            isError: true
+                        };
                     }
+                    if (result.base_resp && result.base_resp.status_code !== 0) {
+                        return {
+                            content: [{ type: "text", text: `Error: ${result.base_resp.status_msg || "Search failed"}` }],
+                            isError: true
+                        };
+                    }
+
+                    const results = result.data?.results;
+                    const text = Array.isArray(results) && results.length > 0
+                        ? results.map((r: SearchResultItem) => `### ${r.title}\nURL: ${r.url}\n${r.snippet}`).join("\n\n")
+                        : "No search results found.";
                     return { content: [{ type: "text", text }] };
                 }
 
                 if (name === "vision") {
-                    const { query, image } = args as { query: string, image: string };
-                    const result = await mimo.performVision(query, [image], request) as any;
-                    const text = result?.data?.content || "No content recognized.";
+                    const { query, image } = (args ?? {}) as { query: string; image: string };
+                    const result: VisionResponse = await mimo.performVision(query, [image], request);
+                    if (result.base_resp.status_code !== 0) {
+                        const detail = result.data.details ? ` | ${result.data.details.slice(0, 300)}` : "";
+                        return {
+                            content: [{ type: "text", text: `Error: ${result.base_resp.status_msg || "Vision failed"}${detail}` }],
+                            isError: true
+                        };
+                    }
+                    const text = result.data.content || "No content recognized.";
                     return { content: [{ type: "text", text }] };
                 }
 
