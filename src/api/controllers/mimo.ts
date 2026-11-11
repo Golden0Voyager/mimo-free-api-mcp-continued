@@ -1163,17 +1163,18 @@ export async function performSearch(query: string, req?: any) {
     // 🌟 平台升级 (2026-10)：react/chat 端点
     const url = `https://aistudio.xiaomimimo.com/open-apis/react/chat?xiaomichatbot_ph=${encodedPh}`;
     
-    logger.info(`[Search Request] Query: ${query} | Model: ${process.env.MCP_SEARCH_MODEL || "mimo-v2.5-pro"}`);
+    const searchModel = process.env.MCP_SEARCH_MODEL || "mimo-v2.6-flash";
+    logger.info(`[Search Request] Query: ${query} | Model: ${searchModel}`);
 
-    const payload: any = {
+    const payload = {
         msgId: uuidv4().replace(/-/g, ''),
         conversationId: uuidv4().replace(/-/g, '').substring(0, 32),
-        query: query,
+        query: `Please search the web for: ${query}`,
         isEditedQuery: false,
         modelConfig: {
-            enableThinking: true,
+            enableThinking: false,
             webSearchStatus: "enabled",
-            model: mapStationModel(process.env.MCP_SEARCH_MODEL || "mimo-v2.5-pro"), 
+            model: mapStationModel(searchModel),
         },
         multiMedias: []
     };
@@ -1208,10 +1209,10 @@ export async function performSearch(query: string, req?: any) {
                 try {
                     const data: unknown = JSON.parse(event.data);
                     if (Array.isArray(data)) {
-                        const results: SearchResultItem[] = data.map((item: { name?: unknown; title?: unknown; url?: unknown; snippet?: unknown }) => ({
+                        const results: SearchResultItem[] = data.map((item: { name?: unknown; title?: unknown; url?: unknown; snippet?: unknown; text?: unknown }) => ({
                             title: String(item?.name ?? item?.title ?? ""),
                             url: String(item?.url ?? ""),
-                            snippet: String(item?.snippet ?? "")
+                            snippet: String(item?.snippet || item?.text || "")
                         }));
                         finish({
                             base_resp: { status_code: 0, status_msg: "success" },
@@ -1289,7 +1290,7 @@ export async function performSearch(query: string, req?: any) {
         }
     });
 
-    // 20秒超时保护
+    // 60秒超时保护
     timeoutId = setTimeout(() => {
         if (!resolved) {
             logger.warn(`[Search Timeout] No results for: ${query}`);
@@ -1298,7 +1299,7 @@ export async function performSearch(query: string, req?: any) {
                 data: { results: [] }
             }, true);
         }
-    }, 20000);
+    }, 60000);
 
     return promise;
 }
