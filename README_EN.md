@@ -37,7 +37,7 @@ English | [简体中文](./README.md)
 
 > [!TIP]
 > **Using V2.6**: Simply pass `model: "mimo-v2.6-pro"` or `"mimo-v2.6-flash"` in your request — vision and web search are verified working; requests explicitly specifying V2.6 keep V2.6 in vision/tool scenarios instead of being downgraded, while requests without a model still auto-upgrade to `mimo-v2.5` (identical behavior to previous versions).
-> **MCP Tool Model Configuration**: You can set `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` in `.env` to choose the models used by the `search` / `vision` tools (defaults: `mimo-v2.5-pro` / `mimo-v2.5`).
+> **MCP Tool Model Configuration**: You can set `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` in `.env` to choose the models used by the `search` / `vision` tools (defaults: `mimo-v2.6-flash` / `mimo-v2.5`).
 
 > [!WARNING]
 > **Tool Calling**: As of v1.4.0, Function Calling works again via the `[TOOL_CALL]` marker protocol (the platform filters the literal `<tool_call>` out of prompts). Verified stable for **external tools** (calendar creation, file operations and other client-only capabilities); however, for questions answerable via web search, the model prefers the platform's built-in search and answers directly instead of calling injected search tools — platform-side behavior that cannot be disabled client-side.
