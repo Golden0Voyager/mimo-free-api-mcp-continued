@@ -1133,6 +1133,29 @@ export async function createCompletion(model: string, messages: any[], convId?: 
     });
 }
 
+export interface SearchResultItem {
+    title: string;
+    url: string;
+    snippet: string;
+}
+
+export interface SearchResponse {
+    base_resp?: { status_code: number; status_msg: string };
+    data?: { results: SearchResultItem[] };
+    results?: SearchResultItem[];
+    error?: unknown;
+    details?: string;
+}
+
+export interface VisionResponse {
+    base_resp: { status_code: number; status_msg: string };
+    data: { content: string; details?: string };
+}
+
+function getErrorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+}
+
 export async function performSearch(query: string, req?: any) {
     const creds = await getCredentials(req);
     const { cookie, xiaomichatbot_ph } = creds;
@@ -1167,107 +1190,117 @@ export async function performSearch(query: string, req?: any) {
 
     const controller = new AbortController();
     
-    return new Promise((resolve, reject) => {
-        let results: any[] = [];
-        let resolved = false;
+    const { promise, resolve } = Promise.withResolvers<SearchResponse>();
+    let resolved = false;
+    let timeoutId: NodeJS.Timeout | undefined;
 
-        const parser = createParser((event) => {
-            if (event.type === "event") {
-                if (event.event === "web_search") {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (Array.isArray(data)) {
-                            results = data.map((item: any) => ({
-                                title: item.name || item.title,
-                                url: item.url,
-                                snippet: item.snippet || ""
-                            }));
-                            resolved = true;
-                            controller.abort(); 
-                            resolve({
-                                base_resp: { status_code: 0, status_msg: "success" },
-                                data: { results }
-                            });
-                        }
-                    } catch (e) {
-                        logger.error(`[Search Parse Error] ${e.message}`);
-                    }
-                } else if (event.event === "error" || event.event === "sensitive_query") {
-                    // 如果后端直接报错（文本超长/敏感拦截等）
-                    logger.error(`[Search API Error Payload] ${event.data}`);
-                    resolved = true;
-                    controller.abort();
-                    resolve({ results: [], error: event.data });
-                }
-            }
-        });
+    const finish = (result: SearchResponse, abortStream = false): void => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutId);
+        if (abortStream) controller.abort();
+        resolve(result);
+    };
 
-        axios.post(url, payload, { 
-            headers, 
-            responseType: "stream", 
-            signal: controller.signal,
-            validateStatus: () => true 
-        }).then(async response => {
-            if (response.status !== 200) {
-                let errBody = "";
+    const parser = createParser((event) => {
+        if (event.type === "event") {
+            if (event.event === "web_search") {
                 try {
-                    // 尝试读取一小段错误体
-                    const chunks: any[] = [];
-                    for await (const chunk of response.data) {
-                        chunks.push(chunk);
-                        if (Buffer.concat(chunks).length > 1000) break;
+                    const data: unknown = JSON.parse(event.data);
+                    if (Array.isArray(data)) {
+                        const results: SearchResultItem[] = data.map((item: { name?: unknown; title?: unknown; url?: unknown; snippet?: unknown }) => ({
+                            title: String(item?.name ?? item?.title ?? ""),
+                            url: String(item?.url ?? ""),
+                            snippet: String(item?.snippet ?? "")
+                        }));
+                        finish({
+                            base_resp: { status_code: 0, status_msg: "success" },
+                            data: { results }
+                        }, true);
                     }
-                    errBody = Buffer.concat(chunks).toString("utf8");
-                } catch (e) {}
-                
-                logger.error(`[Search API Error] HTTP ${response.status} | Body: ${errBody}`);
-                resolve({ results: [], error: `Mimo API Error: ${response.status}`, details: errBody });
-                return;
-            }
-
-            response.data.on("data", (chunk: Buffer) => {
-                parser.feed(chunk.toString("utf8"));
-            });
-
-            response.data.on("end", () => {
-                if (!resolved) {
-                    logger.warn(`[Search End] No search results found for: ${query}`);
-                    resolve({
-                        base_resp: { status_code: 0, status_msg: "success" },
-                        data: { results: [] }
-                    });
+                } catch (e: unknown) {
+                    logger.error(`[Search Parse Error] ${getErrorMessage(e)}`);
                 }
-            });
-
-            response.data.on("error", (err: any) => {
-                if (err.name === 'AbortError' || axios.isCancel(err)) {
-                    // Normal termination
-                } else {
-                    logger.error(`[Search Stream Error] ${err.message}`);
-                    if (!resolved) resolve({ results: [], error: err.message });
-                }
-            });
-        }).catch(err => {
-            if (err.name === 'AbortError' || axios.isCancel(err)) {
-                // Normal termination
-            } else {
-                logger.error(`[Search POST Error] ${err.message}`);
-                resolve({ results: [], error: err.message });
+            } else if (event.event === "error" || event.event === "sensitive_query") {
+                // 如果后端直接报错（文本超长/敏感拦截等）
+                logger.error(`[Search API Error Payload] ${event.data}`);
+                finish({ results: [], error: event.data }, true);
             }
+        }
+    });
+
+    axios.post(url, payload, { 
+        headers, 
+        responseType: "stream", 
+        signal: controller.signal,
+        validateStatus: () => true 
+    }).then(async response => {
+        if (response.status !== 200) {
+            let errBody = "";
+            try {
+                // 尝试读取一小段错误体
+                const chunks: Buffer[] = [];
+                for await (const chunk of response.data) {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                    if (Buffer.concat(chunks).length > 1000) break;
+                }
+                if (typeof response.data?.destroy === 'function') response.data.destroy();
+                errBody = Buffer.concat(chunks).toString("utf8");
+            } catch (e) {}
+            
+            const errorMsg = response.status === 401
+                ? "Mimo API Error: 401 (Unauthorized: MiMo cookie/token expired or invalid)"
+                : `Mimo API Error: ${response.status}`;
+            logger.error(`[Search API Error] HTTP ${response.status} | Body: ${errBody}`);
+            finish({ results: [], error: errorMsg, details: errBody });
+            return;
+        }
+
+        response.data.on("data", (chunk: Buffer) => {
+            parser.feed(chunk.toString("utf8"));
         });
 
-        // 20秒超时保护
-        setTimeout(() => {
+        response.data.on("end", () => {
             if (!resolved) {
-                controller.abort();
-                logger.warn(`[Search Timeout] No results for: ${query}`);
-                resolve({
-                    base_resp: { status_code: 1, status_msg: "Search timeout" },
+                logger.warn(`[Search End] No search results found for: ${query}`);
+                finish({
+                    base_resp: { status_code: 0, status_msg: "success" },
                     data: { results: [] }
                 });
             }
-        }, 20000);
+        });
+
+        response.data.on("error", (err: unknown) => {
+            if (axios.isCancel(err) || (err instanceof Error && err.name === 'AbortError')) {
+                // Normal termination
+            } else {
+                const msg = getErrorMessage(err);
+                logger.error(`[Search Stream Error] ${msg}`);
+                finish({ results: [], error: msg });
+            }
+        });
+    }).catch((err: unknown) => {
+        if (axios.isCancel(err) || (err instanceof Error && err.name === 'AbortError')) {
+            // Normal termination
+        } else {
+            const msg = getErrorMessage(err);
+            logger.error(`[Search POST Error] ${msg}`);
+            finish({ results: [], error: msg });
+        }
     });
+
+    // 20秒超时保护
+    timeoutId = setTimeout(() => {
+        if (!resolved) {
+            logger.warn(`[Search Timeout] No results for: ${query}`);
+            finish({
+                base_resp: { status_code: 1, status_msg: "Search timeout" },
+                data: { results: [] }
+            }, true);
+        }
+    }, 20000);
+
+    return promise;
 }
 /**
  * 🌟 全模态识别接口 (Agent Tool 模式)
@@ -1408,82 +1441,94 @@ export async function performVision(query: string, medias: any[], req?: any) {
         "x-timezone": "Asia/Shanghai"
     };
 
-    return new Promise((resolve, reject) => {
-        let fullContent = "";
-        let resolved = false;
+    const { promise, resolve } = Promise.withResolvers<VisionResponse>();
+    let fullContent = "";
+    let resolved = false;
 
-        const parser = createParser((event) => {
-            if (event.type === "event") {
-                if (event.event === "message") {
-                    try {
-                        const data = JSON.parse(event.data);
-                        // V2.6 模型流中会夹杂 NUL 分隔符，统一剔除
-                        if (data.content) fullContent += String(data.content).replace(/\u0000/g, "");
-                    } catch (e) {}
-                } else if (event.event === "error" || event.event === "sensitive_query") {
-                    logger.error(`[Vision API Error Payload] ${event.data}`);
-                    resolved = true;
-                    resolve({
-                        base_resp: { status_code: 2, status_msg: event.data },
-                        data: { content: fullContent }
-                    });
+    const finish = (result: VisionResponse): void => {
+        if (resolved) return;
+        resolved = true;
+        resolve(result);
+    };
+
+    const parser = createParser((event) => {
+        if (event.type === "event") {
+            if (event.event === "message") {
+                try {
+                    const data = JSON.parse(event.data) as { content?: unknown };
+                    // V2.6 模型流中会夹杂 NUL 分隔符，统一剔除
+                    if (data.content) fullContent += String(data.content).replace(/\u0000/g, "");
+                } catch (e) {}
+            } else if (event.event === "error" || event.event === "sensitive_query") {
+                logger.error(`[Vision API Error Payload] ${event.data}`);
+                finish({
+                    base_resp: { status_code: 2, status_msg: event.data },
+                    data: { content: fullContent }
+                });
+            }
+        }
+    });
+
+    axios.post(url, payload, { 
+        headers, 
+        responseType: "stream",
+        validateStatus: () => true 
+    }).then(async response => {
+        if (response.status !== 200) {
+            let errBody = "";
+            try {
+                const chunks: Buffer[] = [];
+                for await (const chunk of response.data) {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                    if (Buffer.concat(chunks).length > 1000) break;
                 }
+                if (typeof response.data?.destroy === 'function') response.data.destroy();
+                errBody = Buffer.concat(chunks).toString("utf8");
+            } catch (e) {}
+            const statusMsg = response.status === 401
+                ? "HTTP 401 (Unauthorized: MiMo cookie/token expired or invalid)"
+                : `HTTP ${response.status}`;
+            logger.error(`[Vision API Error] HTTP ${response.status} | Body: ${errBody}`);
+            finish({
+                base_resp: { status_code: 3, status_msg: statusMsg },
+                data: { content: fullContent, details: errBody }
+            });
+            return;
+        }
+
+        response.data.on("data", (chunk: Buffer) => {
+            parser.feed(chunk.toString("utf8"));
+        });
+
+        response.data.on("end", () => {
+            if (!resolved) {
+                // 🌟 核心清理：剥离隐藏的思维链标签
+                const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                finish({
+                    base_resp: { status_code: 0, status_msg: "success" },
+                    data: { content: cleanContent }
+                });
             }
         });
 
-        axios.post(url, payload, { 
-            headers, 
-            responseType: "stream",
-            validateStatus: () => true 
-        }).then(async response => {
-            if (response.status !== 200) {
-                let errBody = "";
-                try {
-                    const chunks: any[] = [];
-                    for await (const chunk of response.data) {
-                        chunks.push(chunk);
-                        if (Buffer.concat(chunks).length > 1000) break;
-                    }
-                    errBody = Buffer.concat(chunks).toString("utf8");
-                } catch (e) {}
-                logger.error(`[Vision API Error] HTTP ${response.status} | Body: ${errBody}`);
-                resolve({
-                    base_resp: { status_code: 3, status_msg: `HTTP ${response.status}` },
-                    data: { content: fullContent, details: errBody }
-                });
-                return;
-            }
-
-            response.data.on("data", (chunk: Buffer) => {
-                parser.feed(chunk.toString("utf8"));
-            });
-
-            response.data.on("end", () => {
-                if (!resolved) {
-                    // 🌟 核心清理：剥离隐藏的思维链标签
-                    const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                    resolve({
-                        base_resp: { status_code: 0, status_msg: "success" },
-                        data: { content: cleanContent }
-                    });
-                }
-            });
-
-            response.data.on("error", (err: any) => {
-                logger.error(`[Vision Stream Error] ${err.message}`);
-                if (!resolved) resolve({
-                    base_resp: { status_code: 4, status_msg: err.message },
-                    data: { content: fullContent.trim() }
-                });
-            });
-        }).catch(err => {
-            logger.error(`[Vision POST Error] ${err.message}`);
-            resolve({
-                base_resp: { status_code: 5, status_msg: err.message },
+        response.data.on("error", (err: unknown) => {
+            const msg = getErrorMessage(err);
+            logger.error(`[Vision Stream Error] ${msg}`);
+            finish({
+                base_resp: { status_code: 4, status_msg: msg },
                 data: { content: fullContent.trim() }
             });
         });
+    }).catch((err: unknown) => {
+        const msg = getErrorMessage(err);
+        logger.error(`[Vision POST Error] ${msg}`);
+        finish({
+            base_resp: { status_code: 5, status_msg: msg },
+            data: { content: fullContent.trim() }
+        });
     });
+
+    return promise;
 }
 
 export default {
