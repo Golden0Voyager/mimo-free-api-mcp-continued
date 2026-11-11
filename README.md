@@ -1,11 +1,11 @@
-# MiMo Free API MCP 🚀 Continued (V2.5 + V2.6 Series)
+# MiMo Free API MCP 🚀 Continued (V2.6 Series Default)
 
 [![CI](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml/badge.svg)](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml) [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE) [![Node](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
 [English](./README_EN.md) | 简体中文
 
 
-> 基于小米大模型（MiMo）官方网站（[aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)）逆向构建的高级 OpenAI 兼容网关 + 原生 MCP 插件集成。现已全量适配 **MiMo V2.5 全模态** 系列，并新增 **MiMo V2.6** 系列支持，支持 **Thinking (思维链) 协议** 与 **Omni (全模态) 交互**。
+> 基于小米大模型（MiMo）官方网站（[aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)）逆向构建的高级 OpenAI 兼容网关 + 原生 MCP 插件集成。全量默认升级至 **MiMo V2.6** 系列（`mimo-v2.6-flash` / `mimo-v2.6-pro`），支持 **Thinking (思维链) 协议** 与 **Omni (全模态) 交互**。
 >
 > **🎉 v1.4.0**：已适配平台 2026-10 大版本升级（react 协议），并修复工具调用（Function Calling）。上游 [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) 已于 2026-04 停止维护，本仓库持续跟进平台变更。
 
@@ -13,11 +13,11 @@
 
 ## 🏗️ 核心特性 (V2.5 + V2.6 Features)
 
-1.  **V2.5 全模态适配**: 深度集成 `mimo-v2.5` 与 `mimo-v2.5-pro` 模型，支持原生图像、视频、音频的复杂分析。
-2.  **V2.6 新增支持**: 新增 `mimo-v2.6-pro`（旗舰推理）与 `mimo-v2.6-flash`（极速轻量）两个模型 ID，可直接请求使用；V2.5 仍为默认模型。
+1.  **V2.6 全系默认升级**: 默认对话、自动升配及 MCP 工具（`search` / `vision`）全部升级至 **V2.6 系列**（默认 `mimo-v2.6-flash`，实测覆盖图文/多图/PDF/视频/工具调用与高速联网搜索；推理旗舰 `mimo-v2.6-pro` 按需指定）。
+2.  **V2.5 兼容保留**: 仍可通过显式传参 `mimo-v2.5` / `mimo-v2.5-pro` 调用旧版系列。
 3.  **2026-10 平台升级适配 (v1.4.0)**: 平台切换 react 协议后第一时间跟进迁移（`/open-apis/react/chat`），包括思维链独立字段、图片内容审核（audit/submit）链路与错误事件透传。
 4.  **工具调用修复 (v1.4.0)**: 平台反注入过滤导致旧标记失效，本仓库改用 `[TOOL_CALL]` 标记协议，Function Calling 恢复可用（外部工具场景实测稳定）。
-5.  **透明升级路由**: 保持对旧模型 ID 的兼容。请求 `mimo-v2-omni` 自动路由至 `mimo-v2.5`，`mimo-v2-pro` 路由至 `mimo-v2.5-pro`，已下线的 `mimo-v2-flash` 路由至 `mimo-v2.6-flash`。
+5.  **透明升级路由**: 保持对旧模型 ID 的兼容。`mimo-v2-flash` 与 `mimo-v2-omni` 自动路由至 `mimo-v2.6-flash`，`mimo-v2-pro` 自动路由至 `mimo-v2.6-pro`。
 6.  **环境化 Token 配置**: 支持在 `.env` 中通过 `token` 环境变量（格式：`ph.uid.token`）完成一键部署。
 7.  **Native MCP Server**: 集成最新 MCP 标准。赋予 Claude / Cursor 等客户端原生的 **联网搜索 (`search`)** 与 **视觉分析 (`vision`)** 能力。
 
@@ -27,18 +27,17 @@
 
 | 模型 ID | 基座能力 | 推理思维链 (Thinking) | 核心优势 |
 | :--- | :--- | :--- | :--- |
-| `mimo-v2.6-pro` | **V2.6 旗舰推理版** 🆕 | ✅ 默认开启 | 万亿参数旗舰，最强推理与 Agent 能力 |
-| `mimo-v2.6-flash` | **V2.6 极速轻量版** 🆕 | 🔁 原生思维链（始终输出 `reasoning_content`） | 快速响应，混合推理架构 |
-| `mimo-v2.5` | **全模态旗舰**（默认模型） | ✅ 默认开启 | 视觉、音频、多模态理解最佳方案 |
-| `mimo-v2.5-pro` | **推理增强版** | ✅ 默认开启 | 逻辑严密、最强搜索与长文本分析 |
+| `mimo-v2.6-flash` | **V2.6 全模态主力（默认模型）** 🚀 | 🔁 按需/原生思考 | 兼顾速度与全模态（搜索/图文/多图/PDF/视频/工具调用） |
+| `mimo-v2.6-pro` | **V2.6 旗舰推理版** | ✅ 默认开启 | 万亿参数旗舰，适合高难度文本推理与图文深度分析 |
+| `mimo-v2.5` | **V2.5 全模态（兼容）** | ✅ 默认开启 | 显式指定时可用，未指定则默认走 V2.6 |
+| `mimo-v2.5-pro` | **V2.5 推理版（兼容）** | ✅ 默认开启 | 显式指定时可用 |
 | `mimo-v2-flash` | (已下线) | — | 平台 2026-10 下线，自动路由至 `mimo-v2.6-flash` |
-| `mimo-v2-omni` | (兼容 ID) | ✅ (路由至 2.5) | 兼容旧版 V2-Omni 客户端 |
-| `mimo-v2-pro` | (兼容 ID) | ✅ (路由至 2.5-pro) | 兼容旧版 V2-Pro 客户端 |
+| `mimo-v2-omni` | (兼容 ID) | 🔁 (路由至 2.6-flash) | 兼容旧版 V2-Omni 客户端，自动升级到 V2.6 |
+| `mimo-v2-pro` | (兼容 ID) | ✅ (路由至 2.6-pro) | 兼容旧版 V2-Pro 客户端，自动升级到 V2.6 |
 
 > [!TIP]
-> **使用 V2.6**：在请求中直接传 `model: "mimo-v2.6-pro"` 或 `"mimo-v2.6-flash"` 即可，视觉识别与联网搜索均已实测可用；显式指定 V2.6 的请求在带图/带工具场景下保持 V2.6 不降级，未指定模型的请求仍自动升配至 `mimo-v2.5`（行为与旧版本一致）。
-> **MCP 工具模型配置**：可在 `.env` 中通过 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 指定 `search` / `vision` 工具使用的模型（默认分别为 `mimo-v2.6-flash` / `mimo-v2.5`）。
-
+> **使用 V2.6**：默认不指定模型及视觉/工具自动升配均已切换至 `mimo-v2.6-flash`；显式指定 `mimo-v2.6-pro` 可启用旗舰推理。
+> **MCP 工具模型配置**：可在 `.env` 中通过 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 指定 `search` / `vision` 工具使用的模型（默认均为 `mimo-v2.6-flash`）。
 > [!WARNING]
 > **工具调用 (Tool Calling)**：v1.4.0 起通过 `[TOOL_CALL]` 标记协议恢复可用（平台会在 prompt 中过滤 `<tool_call>` 字面量）。实测**外部工具**（日程创建、文件操作等客户端专属能力）触发稳定；但对联网搜索可回答的问题，模型会倾向使用平台内置搜索直接作答而非调用注入的搜索类工具，这是平台侧行为，无法在客户端禁用。
 
@@ -142,8 +141,8 @@ Authorization: Bearer YOUR_MIMO_TOKEN
 ```
 
 ### 提供的工具 (Tools)
-- **`search(query)`**: AI 自动调用 Mimo 联网搜索。
-- **`vision(query, image)`**: AI 分析图像、视频、音频或本地资源（支持本地绝对路径、Base64 或 URL）。
+- **`search(query, model?, max_results?, include_domains?, exclude_domains?)`**: AI 自动调用 Mimo V2.6 联网搜索，支持 URL 去重合并、来源站点与发布时间元数据输出及域名过滤。
+- **`vision(query, image?, images?, model?)`**: AI 多模态分析（图像/多图对比/视频/音频/PDF，支持本地路径、Base64 或 URL）。
 
 ---
 
