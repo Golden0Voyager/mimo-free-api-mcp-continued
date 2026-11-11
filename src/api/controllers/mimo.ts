@@ -304,9 +304,9 @@ async function uploadMediaToMimo(base64Data: string, cookie: string, xiaomichatb
             else if (isAudio) mediaType = "audio";
             else if (mimeType.includes("pdf")) mediaType = "file";
 
-            // 视频/音频需要短暂后端索引等待；图片通过 audit/submit 状态确认，PDF 无需额外硬等待
-            if (isVideo || isAudio) {
-                await sleep(2500);
+            // 视频/音频/PDF 需要短暂后端索引等待；图片通过 audit/submit 状态确认，无需额外硬等待
+            if (isVideo || isAudio || mediaType === "file") {
+                await sleep(3000);
             }
 
             // 🌟 新协议必需：图片必须提交内容审核 (audit/submit)，否则聊天时被 sensitive_query 静默拦截
@@ -1536,30 +1536,6 @@ export async function performVision(query: string, medias: unknown[], req?: unkn
         }
     }
 
-    const payload = {
-        msgId: uuidv4().replace(/-/g, ''),
-        conversationId: uuidv4().replace(/-/g, '').substring(0, 32),
-        query: query,
-        isEditedQuery: false,
-        modelConfig: {
-            enableThinking,
-            webSearchStatus: "disabled",
-            model: mapStationModel(visionModel),
-        },
-        multiMedias: multiMedias.map((m) => ({
-            mediaType: m.mediaType,
-            fileUrl: m.fileUrl,
-            compressedVideoUrl: m.compressedVideoUrl,
-            audioTrackUrl: m.audioTrackUrl,
-            name: m.name,
-            size: m.size,
-            status: "completed",
-            objectName: m.objectName,
-            tokenUsage: m.tokenUsage,
-            url: m.url
-        }))
-    };
-
     const headers = {
         "Content-Type": "application/json",
         "Accept": "*/*",
@@ -1570,119 +1546,158 @@ export async function performVision(query: string, medias: unknown[], req?: unkn
         "x-timezone": "Asia/Shanghai"
     };
 
-    const controller = new AbortController();
-    const { promise, resolve } = Promise.withResolvers<VisionResponse>();
-    let fullContent = "";
-    let fullReasoning = "";
-    let resolved = false;
-    let timeoutId: NodeJS.Timeout | undefined;
+    const mappedMedias = multiMedias.map((m) => ({
+        mediaType: m.mediaType,
+        fileUrl: m.fileUrl,
+        compressedVideoUrl: m.compressedVideoUrl,
+        audioTrackUrl: m.audioTrackUrl,
+        name: m.name,
+        size: m.size,
+        status: "completed",
+        objectName: m.objectName,
+        tokenUsage: m.tokenUsage,
+        url: m.url
+    }));
+    const mappedModel = mapStationModel(visionModel);
 
-    const finish = (result: VisionResponse, abortStream = false): void => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timeoutId);
-        if (abortStream) controller.abort();
-        resolve(result);
-    };
+    const runAttempt = (): Promise<{ response: VisionResponse; retryable: boolean }> => {
+        const payload = {
+            msgId: uuidv4().replace(/-/g, ''),
+            conversationId: uuidv4().replace(/-/g, '').substring(0, 32),
+            query: query,
+            isEditedQuery: false,
+            modelConfig: {
+                enableThinking,
+                webSearchStatus: "disabled",
+                model: mappedModel,
+            },
+            multiMedias: mappedMedias
+        };
 
-    const parser = createParser((event) => {
-        if (event.type === "event") {
-            if (event.event === "message") {
-                try {
-                    const data = JSON.parse(event.data) as { content?: unknown; reasoningContent?: unknown };
-                    if (data.content) fullContent += String(data.content).replace(/\u0000/g, "");
-                    if (data.reasoningContent) fullReasoning += String(data.reasoningContent).replace(/\u0000/g, "");
-                } catch (e) {}
-            } else if (event.event === "error" || event.event === "sensitive_query") {
-                logger.error(`[Vision API Error Payload] ${event.data}`);
-                finish({
-                    base_resp: { status_code: 2, status_msg: event.data },
-                    data: { content: fullContent }
-                }, true);
-            }
-        }
-    });
+        const controller = new AbortController();
+        const { promise, resolve } = Promise.withResolvers<{ response: VisionResponse; retryable: boolean }>();
+        let fullContent = "";
+        let fullReasoning = "";
+        let resolved = false;
+        let timeoutId: NodeJS.Timeout | undefined;
 
-    axios.post(url, payload, {
-        headers,
-        responseType: "stream",
-        signal: controller.signal,
-        validateStatus: () => true
-    }).then(async response => {
-        if (response.status !== 200) {
-            let errBody = "";
-            try {
-                const chunks: Buffer[] = [];
-                for await (const chunk of response.data) {
-                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-                    if (Buffer.concat(chunks).length > 1000) break;
+        const finish = (response: VisionResponse, retryable: boolean, abortStream = false): void => {
+            if (resolved) return;
+            resolved = true;
+            clearTimeout(timeoutId);
+            if (abortStream) controller.abort();
+            resolve({ response, retryable });
+        };
+
+        const parser = createParser((event) => {
+            if (event.type === "event") {
+                if (event.event === "message") {
+                    try {
+                        const data = JSON.parse(event.data) as { content?: unknown; reasoningContent?: unknown };
+                        if (data.content) fullContent += String(data.content).replace(/\u0000/g, "");
+                        if (data.reasoningContent) fullReasoning += String(data.reasoningContent).replace(/\u0000/g, "");
+                    } catch (e) {}
+                } else if (event.event === "error" || event.event === "sensitive_query") {
+                    logger.error(`[Vision API Error Payload] ${event.data}`);
+                    finish({
+                        base_resp: { status_code: 2, status_msg: event.data },
+                        data: { content: fullContent }
+                    }, false, true);
                 }
-                if (typeof response.data?.destroy === 'function') response.data.destroy();
-                errBody = Buffer.concat(chunks).toString("utf8");
-            } catch (e) {}
-            const statusMsg = response.status === 401
-                ? "HTTP 401 (Unauthorized: MiMo cookie/token expired or invalid)"
-                : `HTTP ${response.status}`;
-            logger.error(`[Vision API Error] HTTP ${response.status} | Body: ${errBody}`);
-            finish({
-                base_resp: { status_code: 3, status_msg: statusMsg },
-                data: { content: fullContent, details: errBody }
-            });
-            return;
-        }
-
-        response.data.on("data", (chunk: Buffer) => {
-            parser.feed(chunk.toString("utf8"));
-        });
-
-        response.data.on("end", () => {
-            if (!resolved) {
-                const rawOutput = fullContent.trim() || fullReasoning.trim();
-                const cleanContent = rawOutput.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                finish({
-                    base_resp: { status_code: 0, status_msg: "success" },
-                    data: { content: cleanContent }
-                });
             }
         });
 
-        response.data.on("error", (err: unknown) => {
+        axios.post(url, payload, {
+            headers,
+            responseType: "stream",
+            signal: controller.signal,
+            validateStatus: () => true
+        }).then(async response => {
+            if (response.status !== 200) {
+                let errBody = "";
+                try {
+                    const chunks: Buffer[] = [];
+                    for await (const chunk of response.data) {
+                        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                        if (Buffer.concat(chunks).length > 1000) break;
+                    }
+                    if (typeof response.data?.destroy === 'function') response.data.destroy();
+                    errBody = Buffer.concat(chunks).toString("utf8");
+                } catch (e) {}
+                const statusMsg = response.status === 401
+                    ? "HTTP 401 (Unauthorized: MiMo cookie/token expired or invalid)"
+                    : `HTTP ${response.status}`;
+                logger.error(`[Vision API Error] HTTP ${response.status} | Body: ${errBody}`);
+                finish({
+                    base_resp: { status_code: 3, status_msg: statusMsg },
+                    data: { content: fullContent, details: errBody }
+                }, response.status >= 500 || response.status === 429);
+                return;
+            }
+
+            response.data.on("data", (chunk: Buffer) => {
+                parser.feed(chunk.toString("utf8"));
+            });
+
+            response.data.on("end", () => {
+                if (!resolved) {
+                    const rawOutput = fullContent.trim() || fullReasoning.trim();
+                    const cleanContent = rawOutput.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    finish({
+                        base_resp: { status_code: 0, status_msg: "success" },
+                        data: { content: cleanContent }
+                    }, false);
+                }
+            });
+
+            response.data.on("error", (err: unknown) => {
+                if (axios.isCancel(err) || (err instanceof Error && err.name === 'AbortError')) {
+                    // Normal termination
+                } else {
+                    const msg = getErrorMessage(err);
+                    logger.error(`[Vision Stream Error] ${msg}`);
+                    const retryable = fullContent.trim().length === 0 && fullReasoning.trim().length === 0;
+                    finish({
+                        base_resp: { status_code: 4, status_msg: msg },
+                        data: { content: fullContent.trim() }
+                    }, retryable);
+                }
+            });
+        }).catch((err: unknown) => {
             if (axios.isCancel(err) || (err instanceof Error && err.name === 'AbortError')) {
                 // Normal termination
             } else {
                 const msg = getErrorMessage(err);
-                logger.error(`[Vision Stream Error] ${msg}`);
+                logger.error(`[Vision POST Error] ${msg}`);
+                const retryable = fullContent.trim().length === 0 && fullReasoning.trim().length === 0;
                 finish({
-                    base_resp: { status_code: 4, status_msg: msg },
+                    base_resp: { status_code: 5, status_msg: msg },
                     data: { content: fullContent.trim() }
-                });
+                }, retryable);
             }
         });
-    }).catch((err: unknown) => {
-        if (axios.isCancel(err) || (err instanceof Error && err.name === 'AbortError')) {
-            // Normal termination
-        } else {
-            const msg = getErrorMessage(err);
-            logger.error(`[Vision POST Error] ${msg}`);
-            finish({
-                base_resp: { status_code: 5, status_msg: msg },
-                data: { content: fullContent.trim() }
-            });
-        }
-    });
 
-    // 90秒超时保护（覆盖大视频及长文档推理）
-    timeoutId = setTimeout(() => {
-        if (!resolved) {
-            logger.warn(`[Vision Timeout] Timed out for query: ${query}`);
-            finish({
-                base_resp: { status_code: 6, status_msg: "Vision timeout" },
-                data: { content: fullContent.trim() }
-            }, true);
-        }
-    }, 90000);
+        // 90秒超时保护（覆盖大视频及长文档推理）
+        timeoutId = setTimeout(() => {
+            if (!resolved) {
+                logger.warn(`[Vision Timeout] Timed out for query: ${query}`);
+                finish({
+                    base_resp: { status_code: 6, status_msg: "Vision timeout" },
+                    data: { content: fullContent.trim() }
+                }, false, true);
+            }
+        }, 90000);
 
-    return promise;
+        return promise;
+    };
+
+    const first = await runAttempt();
+    if (!first.retryable) return first.response;
+
+    logger.info(`[Vision Retry] Retrying react/chat after transient stream error (${first.response.base_resp.status_msg})...`);
+    await sleep(2500);
+    const second = await runAttempt();
+    return second.response;
 }
 
 export default {
