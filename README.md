@@ -37,7 +37,7 @@
 
 > [!TIP]
 > **使用 V2.6**：在请求中直接传 `model: "mimo-v2.6-pro"` 或 `"mimo-v2.6-flash"` 即可，视觉识别与联网搜索均已实测可用；显式指定 V2.6 的请求在带图/带工具场景下保持 V2.6 不降级，未指定模型的请求仍自动升配至 `mimo-v2.5`（行为与旧版本一致）。
-> **MCP 工具模型配置**：可在 `.env` 中通过 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 指定 `search` / `vision` 工具使用的模型（默认分别为 `mimo-v2.5-pro` / `mimo-v2.5`）。
+> **MCP 工具模型配置**：可在 `.env` 中通过 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 指定 `search` / `vision` 工具使用的模型（默认分别为 `mimo-v2.6-flash` / `mimo-v2.5`）。
 
 > [!WARNING]
 > **工具调用 (Tool Calling)**：v1.4.0 起通过 `[TOOL_CALL]` 标记协议恢复可用（平台会在 prompt 中过滤 `<tool_call>` 字面量）。实测**外部工具**（日程创建、文件操作等客户端专属能力）触发稳定；但对联网搜索可回答的问题，模型会倾向使用平台内置搜索直接作答而非调用注入的搜索类工具，这是平台侧行为，无法在客户端禁用。
