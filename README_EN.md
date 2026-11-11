@@ -1,11 +1,11 @@
-# MiMo Free API MCP 🚀 Continued (V2.5 + V2.6 Series)
+# MiMo Free API MCP 🚀 Continued (V2.6 Series Default)
 
 [![CI](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml/badge.svg)](https://github.com/Golden0Voyager/mimo-free-api-mcp-continued/actions/workflows/ci.yml) [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](./LICENSE) [![Node](https://img.shields.io/badge/node-22%2B-green.svg)](https://nodejs.org)
 
 English | [简体中文](./README.md)
 
 
-> An advanced OpenAI-compatible gateway + native MCP plugin integration based on the reverse engineering of the official Xiaomi Large Model (MiMo) website ([aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)). Now fully adapted to the **MiMo V2.5 Multimodal** series, with newly added support for the **MiMo V2.6** series, supporting the **Thinking (Chain of Thought) protocol** and **Omni (Multimodal) interaction**.
+> An advanced OpenAI-compatible gateway + native MCP plugin integration based on the reverse engineering of the official Xiaomi Large Model (MiMo) website ([aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)). Now upgraded by default to the **MiMo V2.6** series (`mimo-v2.6-flash` / `mimo-v2.6-pro`), supporting the **Thinking (Chain of Thought) protocol** and **Omni (Multimodal) interaction**.
 >
 > **🎉 v1.4.0**: Adapted to the platform's major 2026-10 upgrade (react protocol) and restored Function Calling. Upstream [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) went unmaintained in April 2026; this repository keeps tracking platform changes.
 
@@ -13,11 +13,11 @@ English | [简体中文](./README.md)
 
 ## 🏗️ Core Features (V2.5 + V2.6 Features)
 
-1.  **V2.5 Multimodal Adaptation**: Deep integration of `mimo-v2.5` and `mimo-v2.5-pro` models, supporting complex analysis of native images, videos, and audio.
-2.  **New V2.6 Support**: Adds the `mimo-v2.6-pro` (flagship reasoning) and `mimo-v2.6-flash` (ultra-fast lightweight) model IDs, ready to use directly; V2.5 remains the default model.
+1.  **V2.6 Default Upgrade**: Default chat, auto-upgrade, and MCP tools (`search` / `vision`) are upgraded to the **V2.6 series** (default `mimo-v2.6-flash`, verified across web search, single/multi-image, PDF, video, and tool calling; `mimo-v2.6-pro` available on demand).
+2.  **V2.5 Compatibility**: Explicit requests for `mimo-v2.5` / `mimo-v2.5-pro` remain supported.
 3.  **2026-10 Platform Upgrade Adaptation (v1.4.0)**: First-in-time migration after the platform switched to the react protocol (`/open-apis/react/chat`), including the standalone reasoning field, the new image moderation (audit/submit) pipeline, and error event passthrough.
 4.  **Tool Calling Fixed (v1.4.0)**: The platform's anti-injection filter broke the old marker; this repo switched to a `[TOOL_CALL]` marker protocol and Function Calling works again (verified stable for external tools).
-5.  **Transparent Upgrade Routing**: Maintains compatibility with legacy model IDs. Requests for `mimo-v2-omni` are routed to `mimo-v2.5`, `mimo-v2-pro` to `mimo-v2.5-pro`, and the retired `mimo-v2-flash` to `mimo-v2.6-flash`.
+5.  **Transparent Upgrade Routing**: Maintains compatibility with legacy model IDs. Requests for `mimo-v2-flash` and `mimo-v2-omni` auto-route to `mimo-v2.6-flash`, and `mimo-v2-pro` routes to `mimo-v2.6-pro`.
 6.  **Environmental Token Configuration**: Supports one-click deployment via the `token` environment variable (format: `ph.uid.token`) in `.env`.
 7.  **Native MCP Server**: Integrated with the latest MCP standards. Empowers clients like Claude and Cursor with native **web search (`search`)** and **visual analysis (`vision`)** capabilities.
 
@@ -27,18 +27,17 @@ English | [简体中文](./README.md)
 
 | Model ID | Base Capability | Thinking (Reasoning) | Core Advantages |
 | :--- | :--- | :--- | :--- |
-| `mimo-v2.6-pro` | **V2.6 Flagship Reasoning** 🆕 | ✅ Enabled by default | Trillion-parameter flagship, strongest reasoning and agent capabilities |
-| `mimo-v2.6-flash` | **V2.6 Ultra-fast Lightweight** 🆕 | 🔁 Native reasoning (always outputs `reasoning_content`) | Fast response, hybrid reasoning architecture |
-| `mimo-v2.5` | **Multimodal Flagship** (default model) | ✅ Enabled by default | Best for visual, audio, and multimodal understanding |
-| `mimo-v2.5-pro` | **Inference Enhanced** | ✅ Enabled by default | Rigorous logic, strongest search, and long-text analysis |
+| `mimo-v2.6-flash` | **V2.6 Multimodal Workhorse (Default)** 🚀 | 🔁 On-demand/Native | Fast and verified across search, images, multi-image, PDF, video, and tool calling |
+| `mimo-v2.6-pro` | **V2.6 Flagship Reasoning** | ✅ Enabled by default | Trillion-parameter flagship for heavy text reasoning and image analysis |
+| `mimo-v2.5` | **V2.5 Multimodal (Legacy)** | ✅ Enabled by default | Still supported when explicitly requested |
+| `mimo-v2.5-pro` | **V2.5 Inference (Legacy)** | ✅ Enabled by default | Still supported when explicitly requested |
 | `mimo-v2-flash` | (Retired) | — | Retired by the platform in 2026-10; auto-routed to `mimo-v2.6-flash` |
-| `mimo-v2-omni` | (Compatibility ID) | ✅ (Routed to 2.5) | Compatible with legacy V2-Omni clients |
-| `mimo-v2-pro` | (Compatibility ID) | ✅ (Routed to 2.5-pro) | Compatible with legacy V2-Pro clients |
+| `mimo-v2-omni` | (Compatibility ID) | 🔁 (Routed to 2.6-flash) | Compatible with legacy V2-Omni clients, upgraded to V2.6 |
+| `mimo-v2-pro` | (Compatibility ID) | ✅ (Routed to 2.6-pro) | Compatible with legacy V2-Pro clients, upgraded to V2.6 |
 
 > [!TIP]
-> **Using V2.6**: Simply pass `model: "mimo-v2.6-pro"` or `"mimo-v2.6-flash"` in your request — vision and web search are verified working; requests explicitly specifying V2.6 keep V2.6 in vision/tool scenarios instead of being downgraded, while requests without a model still auto-upgrade to `mimo-v2.5` (identical behavior to previous versions).
-> **MCP Tool Model Configuration**: You can set `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` in `.env` to choose the models used by the `search` / `vision` tools (defaults: `mimo-v2.6-flash` / `mimo-v2.5`).
-
+> **Using V2.6**: Default requests and vision/tool auto-upgrades now route to `mimo-v2.6-flash`; pass `mimo-v2.6-pro` explicitly for flagship reasoning.
+> **MCP Tool Model Configuration**: You can set `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` in `.env` to choose the models used by the `search` / `vision` tools (defaults: `mimo-v2.6-flash` for both).
 > [!WARNING]
 > **Tool Calling**: As of v1.4.0, Function Calling works again via the `[TOOL_CALL]` marker protocol (the platform filters the literal `<tool_call>` out of prompts). Verified stable for **external tools** (calendar creation, file operations and other client-only capabilities); however, for questions answerable via web search, the model prefers the platform's built-in search and answers directly instead of calling injected search tools — platform-side behavior that cannot be disabled client-side.
 
@@ -142,8 +141,8 @@ Please add the following configuration to `claude_desktop_config.json`:
 ```
 
 ### Provided Tools
-- **`search(query)`**: AI automatically calls MiMo's web search.
-- **`vision(query, image)`**: AI analyzes images, videos, audio, or local resources (supports local absolute paths, Base64, or URLs).
+- **`search(query, model?, max_results?, include_domains?, exclude_domains?)`**: AI automatically calls MiMo V2.6 web search with URL deduplication, `siteName`/`datePublished` metadata, and optional domain filters.
+- **`vision(query, image?, images?, model?)`**: AI multimodal analysis (single image, multi-image comparison, video, audio, PDF via URL, Base64, or `/app/media`).
 
 ---
 
