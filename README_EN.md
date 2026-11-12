@@ -7,7 +7,7 @@ English | [简体中文](./README.md)
 
 > An advanced OpenAI-compatible gateway + native MCP plugin integration based on the reverse engineering of the official Xiaomi Large Model (MiMo) website ([aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)). Now upgraded by default to the **MiMo V2.6** series (`mimo-v2.6-flash` / `mimo-v2.6-pro`), supporting the **Thinking (Chain of Thought) protocol** and **Omni (Multimodal) interaction**.
 >
-> **🎉 v1.4.0**: Adapted to the platform's major 2026-10 upgrade (react protocol) and restored Function Calling. Upstream [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) went unmaintained in April 2026; this repository keeps tracking platform changes.
+> **🎉 v1.5.0**: Upgraded defaults to the **MiMo V2.6** series (`mimo-v2.6-flash` for chat/search/video/PDF/tools; smart auto-routing to `mimo-v2.6-pro` for image-only vision), added search URL deduplication/metadata/domain filters, multi-image MCP `vision`, and explicit error surfacing. Upstream [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) went unmaintained in April 2026; this repository keeps tracking platform changes.
 
 ---
 
@@ -157,7 +157,7 @@ docker run -d --name mimo-free-api-mcp \
   --restart always \
   -p 8001:8001 \
   -e token=<your-token> \
-  ghcr.io/golden0voyager/mimo-free-api-mcp-continued:v1.4.0
+  ghcr.io/golden0voyager/mimo-free-api-mcp-continued:v1.5.0
 ```
 
 > [!NOTE]
@@ -241,12 +241,13 @@ This project is forked from [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie
 - Base dialogue and the three-step media upload protocol (genUploadInfo → FDS PUT → parse)
 - Unified API & MCP Server architecture and the Docker deployment scheme
 
-**This repository's contributions** (v1.3.0 → v1.4.0):
+**This repository's contributions** (v1.3.0 → v1.5.0):
 
 | Version | Contribution |
 | :--- | :--- |
 | v1.3.0 | MiMo V2.6 series (pro / flash) support; vision/tools auto-upgrade respects explicitly requested V2.6; MCP tool models configurable via `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL`; bare-ID routing fix for V2.6 Flash |
 | v1.4.0 | Adaptation to the platform's 2026-10 react protocol upgrade (old endpoint fully retired): full migration to `/open-apis/react/chat`, standalone `reasoningContent` field, new image moderation (audit/submit) pipeline, `error`/`sensitive_query` passthrough, `[TOOL_CALL]` marker protocol restoring Function Calling, auto-mapping of the retired `mimo-v2-flash` |
+| v1.5.0 | Upgraded defaults to V2.6 with workload routing (image-only vision → `mimo-v2.6-pro`; video/audio/PDF/search/tools → `mimo-v2.6-flash`); search URL dedup/merge, `siteName`/`datePublished` metadata, domain/limit filters & retry; multi-image `images` vision, audit retry, `model:md5`-scoped `mediaCache`, 90s timeout & explicit error surfacing (`isError: true`); pinned `Dockerfile` to `node:24-alpine` |
 | Ongoing | GitHub Actions CI (hard tsc gate + build), GHCR multi-arch prebuilt images, bilingual docs, one-shot deployment prompt, disclaimer and token guide |
 
 > Platform protocol details (react endpoint, SSE event structure, model availability) were verified against live captures of the official web client.
