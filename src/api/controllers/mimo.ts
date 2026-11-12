@@ -223,10 +223,13 @@ async function uploadMediaToMimo(base64Data: string, cookie: string, xiaomichatb
     const buffer = Buffer.from(pureBase64, "base64");
     const md5 = crypto.createHash("md5").update(buffer).digest("hex");
 
-    // 🌟 核心缓存：如果该图片已经上传并解析过，直接复用 ID，实现持久会话
-    if (mediaCache.has(md5)) {
-        logger.info(`[Media Cache Hit] Skipping upload for MD5: ${md5}`);
-        return mediaCache.get(md5);
+    const readyModelForParse = mapStationModel(model);
+    const cacheKey = `${readyModelForParse}:${md5}`;
+
+    // 🌟 核心缓存：按模型+MD5 隔离复用 ID，避免跨模型复用错误解析结果
+    if (mediaCache.has(cacheKey)) {
+        logger.info(`[Media Cache Hit] Skipping upload for ${cacheKey}`);
+        return mediaCache.get(cacheKey);
     }
 
     const mimeResult = await fileTypeFromBuffer(buffer);
@@ -269,7 +272,6 @@ async function uploadMediaToMimo(base64Data: string, cookie: string, xiaomichatb
         logger.info(`[FDS PUT Success] ${objectName}`);
 
         // 3. 注册挂载并换取核心 ID (增加重试机制)
-        const readyModelForParse = mapStationModel(model);
         const parseUrl = `https://aistudio.xiaomimimo.com/open-apis/resource/parse?fileUrl=${encodeURIComponent(resourceUrl)}&objectName=${encodeURIComponent(objectName)}&model=${readyModelForParse}&xiaomichatbot_ph=${encodeURIComponent(xiaomichatbot_ph)}`;
         logger.info(`[Multimedia Parse Request] URL: ${parseUrl}`);
         
@@ -349,7 +351,7 @@ async function uploadMediaToMimo(base64Data: string, cookie: string, xiaomichatb
                 tokenUsage: parseRes.data.data.tokenUsage || 106,
                 url: parseRes.data.data.id // 🌟 核心绑定：/resource/parse 返回 data.id
             };
-            mediaCache.set(md5, result);
+            mediaCache.set(cacheKey, result);
             return result;
         } else {
             throw new Error(`Parse failed after ${retryCount} retries: ${JSON.stringify(parseRes?.data || 'No Response')}`);
@@ -378,6 +380,7 @@ function messagesPrepare(messages: any[]): { query: string, base64Medias: { base
                                 let type = 'image';
                                 if (mime.startsWith('video')) type = 'video';
                                 else if (mime.startsWith('audio')) type = 'audio';
+                                else if (mime.includes('pdf')) type = 'file';
                                 base64Medias.push({ base64, type, mimeType: mime });
                                 seenBase64.add(base64);
                             }
@@ -394,8 +397,10 @@ function messagesPrepare(messages: any[]): { query: string, base64Medias: { base
                                     const base64 = buffer.toString('base64');
                                     if (base64 && !seenBase64.has(base64)) {
                                         let type = 'image';
-                                        if (fileName.endsWith('.mp4') || fileName.endsWith('.mov')) type = 'video';
-                                        else if (fileName.endsWith('.mp3') || fileName.endsWith('.wav')) type = 'audio';
+                                        const lowName = fileName.toLowerCase();
+                                        if (lowName.endsWith('.mp4') || lowName.endsWith('.mov') || lowName.endsWith('.webm')) type = 'video';
+                                        else if (lowName.endsWith('.mp3') || lowName.endsWith('.wav') || lowName.endsWith('.m4a')) type = 'audio';
+                                        else if (lowName.endsWith('.pdf')) type = 'file';
                                         
                                         base64Medias.push({ base64, type, mimeType: "application/octet-stream" });
                                         seenBase64.add(base64);
@@ -451,11 +456,15 @@ export function createCompletionStream(model: string, messages: any[], convId?: 
     let forceThinking = false;
     let lastMsgId = "0";
 
-    // 🌟 2. 智商升配与模型锁定（默认升级到 2.6 系列；显式请求 mimo-v2.6-* 时保持用户选择）
-    const prefersV26 = model.toLowerCase().includes("v2.6");
+    // 🌟 2. 智商升配与模型路由（纯图片默认走 2.6-pro 兼顾速度与细粒度推理；视频/音频/PDF/工具默认走 2.6-flash；显式传 v2.6-* 尊重用户选择）
+    const explicitModel = typeof req?.body?.model === "string" && req.body.model.trim().length > 0;
+    const prefersV26 = explicitModel && model.toLowerCase().includes("v2.6");
+    const isImageOnly = base64Medias.length > 0 && base64Medias.every((m) => m.type === "image");
     if (base64Medias.length > 0) {
-        if (!prefersV26) readyModel = "mimo-v2.6-flash";
-        logger.info(`[AutoUpgrade] Vision detected, using ${readyModel}`);
+        if (!prefersV26) {
+            readyModel = (isImageOnly && !req?.body?.tools) ? "mimo-v2.6-pro" : "mimo-v2.6-flash";
+        }
+        logger.info(`[AutoUpgrade] Vision detected (${isImageOnly ? "image" : "non-image"}), using ${readyModel}`);
     } else if (req?.body?.tools) {
         if (!prefersV26) readyModel = "mimo-v2.6-flash";
         logger.info(`[AutoUpgrade] Tools detected, using ${readyModel}`);
@@ -1444,23 +1453,12 @@ export async function performVision(query: string, medias: unknown[], req?: unkn
     if (req && typeof req === "object" && "body" in req && req.body && typeof req.body === "object" && "model" in req.body && typeof req.body.model === "string") {
         reqBodyModel = req.body.model;
     }
-    const visionModel = options.model || reqBodyModel || process.env.MCP_VISION_MODEL || "mimo-v2.6-flash";
-    const enableThinking = options.enableThinking ?? visionModel.toLowerCase().includes("pro");
-
-    logger.info(`[Vision Request] Query: ${query} | Medias: ${medias.length} | Model: ${visionModel}`);
-
-    interface UploadedMediaItem {
-        mediaType: string;
-        fileUrl: string;
-        compressedVideoUrl: string;
-        audioTrackUrl: string;
-        name: string;
-        size: number;
-        objectName: string;
-        tokenUsage: number;
-        url: string;
+    interface PreparedMediaItem {
+        buffer: Buffer;
+        mimeType: string;
+        md5: string;
     }
-    const multiMedias: UploadedMediaItem[] = [];
+    const preparedMedias: PreparedMediaItem[] = [];
 
     for (const item of medias) {
         const mediaSource = typeof item === 'string'
@@ -1517,22 +1515,46 @@ export async function performVision(query: string, medias: unknown[], req?: unkn
 
         if (buffer.length > 0) {
             const md5 = crypto.createHash("md5").update(buffer).digest("hex");
-            const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
-            const mediaObj = await uploadMediaToMimo(dataUrl, cookie, xiaomichatbot_ph, visionModel) as Partial<UploadedMediaItem> | null;
+            preparedMedias.push({ buffer, mimeType, md5 });
+        }
+    }
 
-            if (mediaObj && mediaObj.url && mediaObj.fileUrl && mediaObj.objectName) {
-                multiMedias.push({
-                    mediaType: mediaObj.mediaType || "image",
-                    fileUrl: mediaObj.fileUrl,
-                    compressedVideoUrl: mediaObj.compressedVideoUrl || "",
-                    audioTrackUrl: mediaObj.audioTrackUrl || "",
-                    name: mediaObj.name || `vision_media_${md5.substring(0, 6)}`,
-                    size: mediaObj.size || buffer.length,
-                    objectName: mediaObj.objectName,
-                    tokenUsage: mediaObj.tokenUsage || 106,
-                    url: mediaObj.url
-                });
-            }
+    const explicitModel = options.model || reqBodyModel || process.env.MCP_VISION_MODEL;
+    const allImages = preparedMedias.length > 0 && preparedMedias.every((m) => m.mimeType.startsWith("image/"));
+    const visionModel = explicitModel || (allImages ? "mimo-v2.6-pro" : "mimo-v2.6-flash");
+    const enableThinking = options.enableThinking ?? visionModel.toLowerCase().includes("pro");
+
+    logger.info(`[Vision Request] Query: ${query} | Medias: ${preparedMedias.length} | Model: ${visionModel} (${explicitModel ? "explicit" : (allImages ? "auto:image->pro" : "auto:media->flash")})`);
+
+    interface UploadedMediaItem {
+        mediaType: string;
+        fileUrl: string;
+        compressedVideoUrl: string;
+        audioTrackUrl: string;
+        name: string;
+        size: number;
+        objectName: string;
+        tokenUsage: number;
+        url: string;
+    }
+    const multiMedias: UploadedMediaItem[] = [];
+
+    for (const media of preparedMedias) {
+        const dataUrl = `data:${media.mimeType};base64,${media.buffer.toString("base64")}`;
+        const mediaObj = await uploadMediaToMimo(dataUrl, cookie, xiaomichatbot_ph, visionModel) as Partial<UploadedMediaItem> | null;
+
+        if (mediaObj && mediaObj.url && mediaObj.fileUrl && mediaObj.objectName) {
+            multiMedias.push({
+                mediaType: mediaObj.mediaType || "image",
+                fileUrl: mediaObj.fileUrl,
+                compressedVideoUrl: mediaObj.compressedVideoUrl || "",
+                audioTrackUrl: mediaObj.audioTrackUrl || "",
+                name: mediaObj.name || `vision_media_${media.md5.substring(0, 6)}`,
+                size: mediaObj.size || media.buffer.length,
+                objectName: mediaObj.objectName,
+                tokenUsage: mediaObj.tokenUsage || 106,
+                url: mediaObj.url
+            });
         }
     }
 
