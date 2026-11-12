@@ -75,7 +75,7 @@ export class MCPServerManager {
                             query: { type: "string", description: "The question or instruction about the media content" },
                             image: { type: "string", description: "Single media source: URL, Base64 data URI, or filename in /app/media (e.g. 'demo.mp4')" },
                             images: { type: "array", items: { type: "string" }, description: "Multiple media sources for comparison or multi-page analysis" },
-                            model: { type: "string", description: "Optional model override (defaults to mimo-v2.6-flash; use mimo-v2.6-pro for heavy single/multi-image reasoning)" },
+                            model: { type: "string", description: "Optional model override (defaults to mimo-v2.6-pro for images, mimo-v2.6-flash for video/audio/PDF)" },
                         },
                         required: ["query"]
                     }
