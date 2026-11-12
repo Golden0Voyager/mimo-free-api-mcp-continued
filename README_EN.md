@@ -13,7 +13,7 @@ English | [简体中文](./README.md)
 
 ## 🏗️ Core Features (V2.5 + V2.6 Features)
 
-1.  **V2.6 Default Upgrade**: Default chat, auto-upgrade, and MCP tools (`search` / `vision`) are upgraded to the **V2.6 series** (default `mimo-v2.6-flash`, verified across web search, single/multi-image, PDF, video, and tool calling; `mimo-v2.6-pro` available on demand).
+1.  **V2.6 Smart Default Upgrade**: Default chat, tool calling, and search route to **`mimo-v2.6-flash`**; pure single/multi-image vision auto-routes to **`mimo-v2.6-pro`** (faster and deeper on complex OCR/charts/UI/code), while video/audio/PDF stay on **`mimo-v2.6-flash`** for reliable completion.
 2.  **V2.5 Compatibility**: Explicit requests for `mimo-v2.5` / `mimo-v2.5-pro` remain supported.
 3.  **2026-10 Platform Upgrade Adaptation (v1.4.0)**: First-in-time migration after the platform switched to the react protocol (`/open-apis/react/chat`), including the standalone reasoning field, the new image moderation (audit/submit) pipeline, and error event passthrough.
 4.  **Tool Calling Fixed (v1.4.0)**: The platform's anti-injection filter broke the old marker; this repo switched to a `[TOOL_CALL]` marker protocol and Function Calling works again (verified stable for external tools).
@@ -36,8 +36,8 @@ English | [简体中文](./README.md)
 | `mimo-v2-pro` | (Compatibility ID) | ✅ (Routed to 2.6-pro) | Compatible with legacy V2-Pro clients, upgraded to V2.6 |
 
 > [!TIP]
-> **Using V2.6**: Default requests and vision/tool auto-upgrades now route to `mimo-v2.6-flash`; pass `mimo-v2.6-pro` explicitly for flagship reasoning.
-> **MCP Tool Model Configuration**: You can set `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` in `.env` to choose the models used by the `search` / `vision` tools (defaults: `mimo-v2.6-flash` for both).
+> **Using V2.6**: Defaults route by workload (`mimo-v2.6-flash` for text/tools/search/video/audio/PDF; `mimo-v2.6-pro` for image-only vision); explicit `model` values are always respected.
+> **MCP Tool Model Configuration**: Set `MCP_SEARCH_MODEL` (default `mimo-v2.6-flash`) / `MCP_VISION_MODEL` (when unset, images auto-route to `mimo-v2.6-pro` and video/audio/PDF to `mimo-v2.6-flash`) in `.env` to override.
 > [!WARNING]
 > **Tool Calling**: As of v1.4.0, Function Calling works again via the `[TOOL_CALL]` marker protocol (the platform filters the literal `<tool_call>` out of prompts). Verified stable for **external tools** (calendar creation, file operations and other client-only capabilities); however, for questions answerable via web search, the model prefers the platform's built-in search and answers directly instead of calling injected search tools — platform-side behavior that cannot be disabled client-side.
 
