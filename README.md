@@ -7,7 +7,7 @@
 
 > 基于小米大模型（MiMo）官方网站（[aistudio.xiaomimimo.com](https://aistudio.xiaomimimo.com)）逆向构建的高级 OpenAI 兼容网关 + 原生 MCP 插件集成。全量默认升级至 **MiMo V2.6** 系列（`mimo-v2.6-flash` / `mimo-v2.6-pro`），支持 **Thinking (思维链) 协议** 与 **Omni (全模态) 交互**。
 >
-> **🎉 v1.4.0**：已适配平台 2026-10 大版本升级（react 协议），并修复工具调用（Function Calling）。上游 [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) 已于 2026-04 停止维护，本仓库持续跟进平台变更。
+> **🎉 v1.5.0**：全量默认升级至 **MiMo V2.6** 系列（文本/搜索/视频/PDF 走 `mimo-v2.6-flash`，纯图片/多图识图自动走 `mimo-v2.6-pro`），新增搜索 URL 去重合并、域名过滤与站点/日期元数据，以及 MCP 多图对比与错误显式透传。上游 [Fu-Jie/mimo-free-api-mcp](https://github.com/Fu-Jie/mimo-free-api-mcp) 已于 2026-04 停止维护，本仓库持续跟进平台变更。
 
 ---
 
@@ -157,7 +157,7 @@ docker run -d --name mimo-free-api-mcp \
   --restart always \
   -p 8001:8001 \
   -e token=<你的Token> \
-  ghcr.io/golden0voyager/mimo-free-api-mcp-continued:v1.4.0
+  ghcr.io/golden0voyager/mimo-free-api-mcp-continued:v1.5.0
 ```
 
 > [!NOTE]
@@ -241,12 +241,13 @@ docker compose up -d --build
 - 基础对话、视觉上传三步走（genUploadInfo → FDS PUT → parse）协议
 - 统一 API & MCP Server 架构、Docker 部署方案
 
-**本仓库的贡献**（v1.3.0 → v1.4.0）：
+**本仓库的贡献**（v1.3.0 → v1.5.0）：
 
 | 版本 | 贡献 |
 | :--- | :--- |
 | v1.3.0 | MiMo V2.6 系列（pro / flash）支持；视觉/工具自动升配尊重显式 V2.6 请求；MCP 工具模型可经 `MCP_SEARCH_MODEL` / `MCP_VISION_MODEL` 配置；V2.6 Flash 裸 ID 路由修复 |
 | v1.4.0 | 适配平台 2026-10 react 协议升级（旧端点已全面失效）：全链路迁移至 `/open-apis/react/chat`、思维链独立 `reasoningContent` 字段、图片审核（audit/submit）新链路、`error`/`sensitive_query` 事件透传、`[TOOL_CALL]` 标记协议使 Function Calling 恢复可用、已下线 `mimo-v2-flash` 自动映射 |
+| v1.5.0 | 默认模型与路由全面升级至 V2.6（按媒体类型自动分流：`image` → `mimo-v2.6-pro`，`video/audio/PDF/search/tools` → `mimo-v2.6-flash`）；MCP `search` 去重合并、`siteName`/`datePublished` 元数据、域名/条数过滤及空流重试；MCP `vision` 多图 `images` 对比、审核重试、`model:md5` 缓存隔离、90s 超时及 401/下载错误显式透传；Dockerfile 固定 `node:24-alpine` |
 | 持续性 | GitHub Actions CI（tsc 硬门槛 + 构建）、GHCR 双架构预构建镜像、中英双语文档、一键部署 Prompt、免责声明与 Token 获取教程 |
 
 > 平台协议信息（react 端点、SSE 事件结构、模型存留）均来自对官方网页客户端的实机抓包验证。
